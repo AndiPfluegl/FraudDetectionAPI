@@ -51,3 +51,4 @@ This repository contains a Flask-based RESTful API for fraud detection using a p
    The API will be available at http://0.0.0.0:5000.
 
 ## Usage
+- **Endpoint**: /predict
