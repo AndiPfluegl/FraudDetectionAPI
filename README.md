@@ -1,31 +1,37 @@
-Fraud Detection API
+# Fraud Detection API
+
 This repository contains a Flask-based RESTful API for fraud detection using a pre-trained Random Forest model. It was developed as part of a project to detect fraudulent financial transactions and provide a scalable, cloud-ready solution.
 
-Project Structure
-app.py: The main Flask application defining the /predict endpoint.
-rf_model.pkl: The pre-trained Random Forest model serialized with Pickle.
-requirements.txt: A list of required Python packages.
-README.md: This documentation file.
-Features
-REST API Endpoint: Accepts POST requests with JSON payloads containing feature data.
-Fraud Prediction: Returns the probability of a transaction being fraudulent.
-Production-Ready Configuration: Uses environment variables and proper logging for secure deployment.
-Prerequisites
-Python 3.8 or higher
-A virtual environment is recommended
-The following key dependencies (see requirements.txt for the full list):
-Flask
-scikit-learn
-numpy
-pandas
-gunicorn (recommended for production deployment)
-Installation
-Clone the Repository:
+## Project Structure
 
-bash
-Kopieren
-git clone https://github.com/yourusername/FraudDetectionAPI.git
-cd FraudDetectionAPI
+- **app.py**: The main Flask application defining the `/predict` endpoint.
+- **rf_model.pkl**: The pre-trained Random Forest model serialized with Pickle.
+- **requirements.txt**: A list of required Python packages.
+- **README.md**: This documentation file.
+
+## Features
+
+- **REST API Endpoint**: Accepts POST requests with JSON payloads containing feature data.
+- **Fraud Prediction**: Returns the probability of a transaction being fraudulent.
+- **Production-Ready Configuration**: Uses environment variables and proper logging for secure deployment.
+
+## Prerequisites
+
+- Python 3.8 or higher
+- A virtual environment is recommended
+- Key dependencies (see `requirements.txt` for the full list):
+  - Flask
+  - scikit-learn
+  - numpy
+  - pandas
+  - gunicorn (recommended for production deployment)
+
+## Installation
+
+1. **Clone the Repository:**
+   ```bash
+   git clone https://github.com/yourusername/FraudDetectionAPI.git
+   cd FraudDetectionAPI
 Create and Activate a Virtual Environment:
 
 bash
@@ -81,3 +87,7 @@ This project is licensed under the MIT License.
 Acknowledgments
 This project was developed as part of a university assignment to explore fraud detection using machine learning.
 
+pgsql
+Kopieren
+
+Simply copy all the text above and paste it into your `README.md` file. Feel free to modify any se
