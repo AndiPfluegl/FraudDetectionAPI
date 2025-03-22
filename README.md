@@ -55,4 +55,14 @@ This repository contains a Flask-based RESTful API for fraud detection using a p
 - **Method**: POST
 - **Payload Format**:
   The API expects a JSON object with a key "data", which is a list of observations. Each observation should be a list of feature values matching the order used during model training.
+**Exable using cURL:**
+  ```bash
+  curl -X POST -H "Content-Type: application/json" -d '{"data": [[0.1, -1.2, 0.5, 0.3, 0.0, 0.2, -0.4, 1.1, -0.3, 0.7, 0.5, -0.1, 0.2, 0.3, -0.2, 0.4, 0.6, -0.5, 0.0, 0.1, 0.2, -0.3, 0.4, 0.5, 0.6, -0.1, 0.0, 0.2, 0.5]]}' http://0.0.0.0:5000/predict
+
+## Deployment
+This application is designed to be deployed on Azure App Service. For deployment:
+- Use GitHub integration for automated deployments.
+- Configure Application Settings in the Azure Portal (e.g., MODEL_PATH and PORT).
+- Set up monitoring with Application Insights.
+For detailed deployment instructions, refer to the Azure documentation and the project’s deployment guide.
 
