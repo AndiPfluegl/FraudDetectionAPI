@@ -52,3 +52,7 @@ This repository contains a Flask-based RESTful API for fraud detection using a p
 
 ## Usage
 - **Endpoint**: /predict
+- **Method**: POST
+- **Payload Format**:
+  The API expects a JSON object with a key "data", which is a list of observations. Each observation should be a list of feature values matching the order used during model training.
+
