@@ -23,7 +23,7 @@ COPY --from=builder /usr/local/lib/python3.10/site-packages /usr/local/lib/pytho
 
 # kopiere Service‑Code, Modell und MLOps‑Skripte
 COPY app.py \
-     rf_model.pkl \
+     models/rf_model.pkl \
      retrain_model.py \
      drift_detector.py \
      drift_config.json \
