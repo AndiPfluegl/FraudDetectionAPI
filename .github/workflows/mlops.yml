@@ -91,19 +91,22 @@ jobs:
     runs-on: [self-hosted, Windows]
     steps:
       - name: Pull & restart container locally
-        # PowerShell ist der Default auf Windows, hier zur Sicherheit explizit
         shell: powershell
         run: |
-          # 1) Image holen (Owner lowercased)
-          docker pull ghcr.io/${{ toLower(github.repository_owner) }}/fraud-api:latest
+          # Owner in lowercase ermitteln
+          $owner = '${{ github.repository_owner }}'.ToLower()
+          Write-Host "Deploying image for owner: $owner"
 
-          # 2) Alten Container entfernen (falls existent)
-          docker rm -f fraud_api
+          # Image ziehen
+          docker pull ghcr.io/$owner/fraud-api:latest
 
-          # 3) Neuen Container starten, API_TOKEN und THRESHOLD als ENV
+          # Alten Container entfernen
+          docker rm -f fraud_api -ErrorAction SilentlyContinue
+
+          # Neuen Container starten
           docker run -d --name fraud_api `
             --env "API_TOKEN=${{ secrets.API_TOKEN }}" `
             --env "FRAUD_THRESHOLD=0.4" `
             -p 5000:5000 `
-            ghcr.io/${{ toLower(github.repository_owner) }}/fraud-api:latest
+            ghcr.io/$owner/fraud-api:latest
 
