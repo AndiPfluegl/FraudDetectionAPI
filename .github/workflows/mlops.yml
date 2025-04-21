@@ -1,5 +1,9 @@
 name: MLOps Pipeline
 
+permissions:
+  contents: read
+  packages: write
+
 on:
   push:
     branches: [main]
