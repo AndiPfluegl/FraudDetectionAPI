@@ -93,19 +93,14 @@ jobs:
       API_TOKEN: ${{ secrets.API_TOKEN }}
       FRAUD_THRESHOLD: "0.4"
     steps:
-      - name: Set lowercase owner
-        shell: powershell
-        run: |
-          $lc = '${{ github.repository_owner }}'.ToLower()
-          echo "OWNER_LC=$lc" >> $Env:GITHUB_ENV
-
       - name: Pull & restart container locally
         shell: cmd
         run: |
-          echo Owner: %OWNER_LC%
-          docker pull ghcr.io/%OWNER_LC%/fraud-api:latest
+          REM Hier direkt lowercase Owner verwenden
+          docker pull ghcr.io/andipfluegl/fraud-api:latest
           docker rm -f fraud_api || echo No existing container
-          docker run -d --name fraud_api --env "API_TOKEN=%API_TOKEN%" --env "FRAUD_THRESHOLD=%FRAUD_THRESHOLD%" -p 5000:5000 ghcr.io/%OWNER_LC%/fraud-api:latest
+          docker run -d --name fraud_api --env "API_TOKEN=%API_TOKEN%" --env "FRAUD_THRESHOLD=%FRAUD_THRESHOLD%" -p 5000:5000 ghcr.io/andipfluegl/fraud-api:latest
+
 
 
 
