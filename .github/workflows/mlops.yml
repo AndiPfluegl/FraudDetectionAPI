@@ -1,0 +1,86 @@
+name: MLOps Pipeline
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  schedule:
+    - cron: '0 0 1 * *'  # monatlich am 1. um 00:00 UTC
+
+jobs:
+  drift:
+    runs-on: ubuntu-latest
+    outputs:
+      drift-detected: ${{ steps.detect.outputs.drift }}
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install drift dependencies
+        run: pip install pandas scipy joblib
+
+      - name: Run drift detection
+        id: detect
+        run: |
+          python drift_detector.py
+          echo "::set-output name=drift::$(jq .drift_detected drift_result.json)"
+
+      - name: Upload drift result
+        uses: actions/upload-artifact@v3
+        with:
+          name: drift-result
+          path: drift_result.json
+
+  retrain:
+    needs: drift
+    if: needs.drift.outputs.drift == 'true' || github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install retrain dependencies
+        run: pip install -r requirements.txt mlflow
+
+      - name: Retrain model & log to MLflow
+        run: python retrain_model.py
+
+      - name: Upload new model artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: model-artifact
+          path: models/rf_model.pkl
+
+  build-and-push:
+    needs: retrain
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build & push Docker image
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/fraud-api:latest
+            ghcr.io/${{ github.repository_owner }}/fraud-api:${{ github.sha }}
+
+  deploy:
+    needs: build-and-push
+    runs-on: [self-hosted, Windows]
+    steps:
+      - name: Pull & restart container locally
+        run: |
+          docker pull ghcr.io/${{ github.repository_owner }}/fraud-api:latest
+          docker rm -f fraud_api || true
+          docker run -d --name fraud_api \
+            -e API_TOKEN="${{ secrets.API_TOKEN }}" \
+            -e FRAUD_THRESHOLD="0.4" \
+            -p 5000:5000 \
+            ghcr.io/${{ github.repository_owner }}/fraud-api:latest
