@@ -89,28 +89,20 @@ jobs:
   deploy:
     needs: build-and-push
     runs-on: [self-hosted, Windows]
+    # GitHub‑Variablen und Secrets als ENV verfügbar machen
+    env:
+      OWNER: ${{ github.repository_owner }}
+      API_TOKEN: ${{ secrets.API_TOKEN }}
+      FRAUD_THRESHOLD: 0.4
     steps:
       - name: Pull & restart container locally
-        shell: powershell
+        # CMD statt PowerShell
+        shell: cmd
         run: |
-          # temporär Script‑Execution erlauben
-          Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process -Force
+          echo Owner: %OWNER%
+          docker pull ghcr.io/%OWNER%/fraud-api:latest
+          docker rm -f fraud_api || echo "No existing container"
+          docker run -d --name fraud_api --env "API_TOKEN=%API_TOKEN%" --env "FRAUD_THRESHOLD=%FRAUD_THRESHOLD%" -p 5000:5000 ghcr.io/%OWNER%/fraud-api:latest
 
-          # Owner in lowercase ermitteln
-          $owner = '${{ github.repository_owner }}'.ToLower()
-          Write-Host "Deploying image for owner: $owner"
-
-          # Image ziehen
-          docker pull ghcr.io/$owner/fraud-api:latest
-
-          # Alten Container entfernen
-          docker rm -f fraud_api -ErrorAction SilentlyContinue
-
-          # Neuen Container starten
-          docker run -d --name fraud_api `
-            --env "API_TOKEN=${{ secrets.API_TOKEN }}" `
-            --env "FRAUD_THRESHOLD=0.4" `
-            -p 5000:5000 `
-            ghcr.io/$owner/fraud-api:latest
 
 
