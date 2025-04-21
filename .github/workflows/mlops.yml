@@ -44,7 +44,7 @@ jobs:
         run: python retrain_model.py
 
       - name: Upload new model artifact
-        uses: actions/upload-artifact@v3.1.1
+        uses: actions/upload-artifact@v2
         with:
           name: model-artifact
           path: models/rf_model.pkl
