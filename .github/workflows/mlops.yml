@@ -93,6 +93,9 @@ jobs:
       - name: Pull & restart container locally
         shell: powershell
         run: |
+          # temporär Script‑Execution erlauben
+          Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process -Force
+
           # Owner in lowercase ermitteln
           $owner = '${{ github.repository_owner }}'.ToLower()
           Write-Host "Deploying image for owner: $owner"
@@ -109,4 +112,5 @@ jobs:
             --env "FRAUD_THRESHOLD=0.4" `
             -p 5000:5000 `
             ghcr.io/$owner/fraud-api:latest
+
 
