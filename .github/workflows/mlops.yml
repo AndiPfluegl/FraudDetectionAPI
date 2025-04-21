@@ -25,7 +25,7 @@ jobs:
           echo "::set-output name=drift::$(jq .drift_detected drift_result.json)"
 
       - name: Upload drift result
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v3.1.1
         with:
           name: drift-result
           path: drift_result.json
@@ -44,7 +44,7 @@ jobs:
         run: python retrain_model.py
 
       - name: Upload new model artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v3.1.1
         with:
           name: model-artifact
           path: models/rf_model.pkl
