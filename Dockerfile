@@ -30,11 +30,12 @@ COPY --from=builder /usr/local/bin /usr/local/bin
 
 # 2c) Kopiere deinen Service‑Code, Modell und MLOps‑Skripte
 COPY app.py \
-     models/rf_model.pkl \
      retrain_model.py \
      drift_detector.py \
      drift_config.json \
      ./
+
+COPY models ./models
 
 # Port freigeben
 EXPOSE 5000
