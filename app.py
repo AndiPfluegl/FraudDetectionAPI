@@ -12,7 +12,7 @@ API_TOKEN = os.environ.get("API_TOKEN")
 if not API_TOKEN:
     raise RuntimeError("Environment variable API_TOKEN must be set")
 
-MODEL_PATH      = os.environ.get("MODEL_PATH", "models/rf_model.pkl")
+MODEL_PATH = os.environ.get("MODEL_PATH", "models/rf_model.pkl")
 FRAUD_THRESHOLD = float(os.environ.get("FRAUD_THRESHOLD", 0.4))
 
 # ——— App & Logging ———

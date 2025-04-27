@@ -96,12 +96,13 @@ jobs:
       - name: Pull & restart container locally
         shell: cmd
         run: |
-          REM Hier direkt lowercase Owner verwenden
           docker pull ghcr.io/andipfluegl/fraud-api:latest
           docker rm -f fraud_api || echo No existing container
-          docker run -d --name fraud_api --env "API_TOKEN=%API_TOKEN%" --env "FRAUD_THRESHOLD=%FRAUD_THRESHOLD%" -p 5000:5000 ghcr.io/andipfluegl/fraud-api:latest
-
-
-
+          docker run -d --name fraud_api ^
+            --env "API_TOKEN=%API_TOKEN%" ^
+            --env "FRAUD_THRESHOLD=%FRAUD_THRESHOLD%" ^
+            --env "MODEL_PATH=%MODEL_PATH%" ^
+            -p 5000:5000 ^
+            ghcr.io/andipfluegl/fraud-api:latest
 
 
