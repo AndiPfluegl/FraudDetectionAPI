@@ -92,6 +92,7 @@ jobs:
     env:
       API_TOKEN: ${{ secrets.API_TOKEN }}
       FRAUD_THRESHOLD: "0.4"
+      MODEL_PATH: "models/rf_model.pkl"
     steps:
       - name: Pull & restart container locally
         shell: cmd
