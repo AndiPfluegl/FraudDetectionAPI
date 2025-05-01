@@ -1,4 +1,4 @@
-import os
+import csv, os
 import logging
 from flask import Flask, request, jsonify, Response
 import pickle
@@ -6,6 +6,7 @@ import numpy as np
 from prometheus_flask_exporter import PrometheusMetrics
 from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
 from functools import wraps
+from datetime import datetime
 
 # ——— Konfiguration ———
 API_TOKEN = os.environ.get("API_TOKEN")
@@ -14,6 +15,7 @@ if not API_TOKEN:
 
 MODEL_PATH = os.environ.get("MODEL_PATH", "models/rf_model.pkl")
 FRAUD_THRESHOLD = float(os.environ.get("FRAUD_THRESHOLD", 0.4))
+LATEST_DATA_PATH = os.environ.get("LATEST_DATA_PATH", "data/latest_data.csv")
 
 # ——— App & Logging ———
 app = Flask(__name__)
@@ -91,6 +93,10 @@ def predict():
         PREDICT_COUNTER.labels(predicted_class=label).inc()
         FRAUD_PROB.observe(p)
 
+    with open(LATEST_DATA_PATH, "a", newline="") as f:
+        writer = csv.writer(f)
+        for row in input_data.tolist():
+            writer.writerow(row)
     return jsonify({"fraud_probability": probs.tolist()})
 
 # ——— App starten ———
