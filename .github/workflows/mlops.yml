@@ -41,7 +41,7 @@ jobs:
 
   retrain:
     needs: drift
-    if: needs.drift.outputs.drift == 'true' || github.event_name == 'schedule'
+    if: needs.drift.outputs.drift-detected == 'true' || github.event_name == 'schedule'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
