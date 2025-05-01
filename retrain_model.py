@@ -6,7 +6,7 @@ import mlflow
 import os
 
 # Config
-DATA_PATH     = "data/latest_data.csv"
+DATA_PATH     = os.environ.get("TRAIN_DATA_PATH", "data/latest_data.csv")
 MODEL_OUT     = "models/rf_model.pkl"
 MLFLOW_EXPER  = "FraudDetection"
 MLFLOW_REG    = "fraud-api"

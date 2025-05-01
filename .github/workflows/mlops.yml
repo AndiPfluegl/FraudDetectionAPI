@@ -19,14 +19,31 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - name: Install drift dependencies
-        run: pip install pandas scipy joblib
+      # 1) Basis-Dependencies
+      - name: Install drift & simulation dependencies
+        run: |
+          pip install pandas scipy joblib numpy
 
-      - name: Run drift detection
+      # 2) Simuliere 12 Monats-Datensätze
+      - name: Generate monthly data
+        run: python simulate_data.py
+
+      # 3) Für jeden Monat drift testen
+      - name: Run drift detection for each month
         id: detect
         run: |
-          python drift_detector.py
-          echo "::set-output name=drift::$(jq .drift_detected drift_result.json)"
+          for month in {1..12}; do
+            echo "→ Testing month $month"
+            export NEW_DATA_PATH="data/monthly/new_data_month_${month}.csv"
+            python drift_detector.py > drift_log_$month.txt
+            # Den Output auswerten und beim ersten True abbrechen
+            if grep -q "True" drift_log_$month.txt; then
+              echo "::set-output name=drift::true"
+              exit 0
+            fi
+          done
+          # Wenn nie Drift, setze auf false
+          echo "::set-output name=drift::false"
 
       - name: Upload drift result
         uses: actions/upload-artifact@v4
@@ -36,7 +53,6 @@ jobs:
 
   retrain:
     needs: drift
-    # immer retrainen bei Push oder wenn Drift erkannt wurde - muss zurückgesetzt werden!!!! if: needs.drift.outputs.drift == 'true' || github.event_name == 'schedule'
     if: github.event_name == 'push' || needs.drift.outputs.drift == 'true' || github.event_name == 'schedule'
     runs-on: ubuntu-latest
     steps:
@@ -45,7 +61,10 @@ jobs:
       - name: Install retrain dependencies
         run: pip install -r requirements.txt mlflow
 
+      # Hier das ENV für die simulierten Monatsdaten übergeben:
       - name: Retrain model & log to MLflow
+        env:
+          TRAIN_DATA_PATH: data/monthly/new_data_month_1.csv   # ← Monat wählen
         run: python retrain_model.py
 
       - name: Upload new model artifact

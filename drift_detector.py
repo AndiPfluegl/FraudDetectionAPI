@@ -1,12 +1,12 @@
+import os
 import pandas as pd
 from scipy.stats import ks_2samp
 import joblib
-import os
 import json
 
-# Pfade
-OLD_DATA_PATH = "data/reference_data.csv"
-NEW_DATA_PATH = "data/latest_data.csv"
+# Pfade (ENV zuerst, sonst Default)
+OLD_DATA_PATH = os.environ.get("OLD_DATA_PATH", "data/reference_data.csv")
+NEW_DATA_PATH = os.environ.get("NEW_DATA_PATH", "data/latest_data.csv")
 DRIFT_CONFIG  = "drift_config.json"
 
 # Lade Konfiguration
