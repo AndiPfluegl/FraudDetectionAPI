@@ -1,4 +1,5 @@
-import csv, os
+import csv
+import os
 import logging
 from flask import Flask, request, jsonify, Response
 import pickle
@@ -9,20 +10,24 @@ from functools import wraps
 from datetime import datetime
 
 # ——— Konfiguration ———
-API_TOKEN = os.environ.get("API_TOKEN")
+API_TOKEN        = os.environ.get("API_TOKEN")
 if not API_TOKEN:
     raise RuntimeError("Environment variable API_TOKEN must be set")
-
-MODEL_PATH = os.environ.get("MODEL_PATH", "models/rf_model.pkl")
-FRAUD_THRESHOLD = float(os.environ.get("FRAUD_THRESHOLD", 0.4))
+MODEL_PATH       = os.environ.get("MODEL_PATH", "models/rf_model.pkl")
+FRAUD_THRESHOLD  = float(os.environ.get("FRAUD_THRESHOLD", 0.4))
 LATEST_DATA_PATH = os.environ.get("LATEST_DATA_PATH", "data/latest_data.csv")
+
+# ——— Verzeichnis & Header für latest_data.csv anlegen ———
+os.makedirs(os.path.dirname(LATEST_DATA_PATH), exist_ok=True)
+# FEATURES kennen wir erst nach dem Laden des Modells, darum hier Platzhalter
+# Wir erzeugen den Header erst weiter unten, sobald FEATURES definiert ist.
 
 # ——— App & Logging ———
 app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# ——— Einfacher Token‑Check Decorator ———
+# ——— Einfacher Token-Check Decorator ———
 def require_token(f):
     @wraps(f)
     def wrapped(*args, **kwargs):
@@ -38,13 +43,12 @@ metrics = PrometheusMetrics(app, path=None)
 @app.route("/metrics")
 @require_token
 def metrics_endpoint():
-    # manuelles Exportieren aller registrierten Metriken
     data = generate_latest(metrics.registry)
     return Response(data, mimetype=CONTENT_TYPE_LATEST)
 
 metrics.info("app_info", "Fraud Detection Service Info", version="1.0")
 
-# ——— Modell‑Metriken ———
+# ——— Modell-Metriken ———
 PREDICT_COUNTER = Counter(
     "predictions_total",
     "Number of predictions",
@@ -65,7 +69,23 @@ except Exception as e:
     logger.error("Failed to load model: %s", e)
     model = None
 
+# ——— FEATURES definieren und Header in latest_data.csv schreiben ———
 FEATURES = ["V" + str(i) for i in range(1, 29)] + ["Amount_scaled"]
+# Header einfügen, falls noch nicht geschehen
+if os.path.isfile(LATEST_DATA_PATH):
+    # Datei existiert, aber prüfen, ob leer oder nicht-CSV-Header
+    with open(LATEST_DATA_PATH, "r", newline="") as f:
+        first = f.readline().strip().split(",")
+    if first != FEATURES:
+        # Datei ist leer oder fehlerhafter Header: neu anlegen
+        with open(LATEST_DATA_PATH, "w", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerow(FEATURES)
+else:
+    # Datei fehlt ganz
+    with open(LATEST_DATA_PATH, "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(FEATURES)
 
 # ——— Predict Endpoint ———
 @app.route("/predict", methods=["POST"])
@@ -93,10 +113,16 @@ def predict():
         PREDICT_COUNTER.labels(predicted_class=label).inc()
         FRAUD_PROB.observe(p)
 
-    with open(LATEST_DATA_PATH, "a", newline="") as f:
-        writer = csv.writer(f)
-        for row in input_data.tolist():
-            writer.writerow(row)
+    # ==== Logging der Features ins latest_data.csv ====
+    try:
+        with open(LATEST_DATA_PATH, "a", newline="") as f:
+            writer = csv.writer(f)
+            for row in input_data.tolist():
+                writer.writerow(row)
+    except Exception as e:
+        logger.error("Could not write to latest_data.csv: %s", e)
+    # ===================================================
+
     return jsonify({"fraud_probability": probs.tolist()})
 
 # ——— App starten ———
