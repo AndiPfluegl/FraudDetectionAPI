@@ -1,23 +1,21 @@
-import os
 import pandas as pd
 import numpy as np
-import subprocess
+import os
 
 # Pfade anpassen
 REFERENCE_PATH = 'data/reference_data.csv'
-OUTPUT_DIR = 'data/monthly'
+OUTPUT_DIR    = 'data/monthly'
 
-# Stelle sicher, dass das Ausgabeverzeichnis existiert
+# Sicherstellen, dass das Ausgabeverzeichnis existiert
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 # Referenzdaten laden
 df_ref = pd.read_csv(REFERENCE_PATH)
 
 # Features, auf die wir Drift anwenden
-# Hier alle 'V'-Spalten und 'Amount_scaled'
 FEATURE_COLS = [c for c in df_ref.columns if c.startswith('V')] + ['Amount_scaled']
 
-print("Erstelle simulierte Monatsdaten mit zunehmendem Drift…")
+# Erzeuge für 12 Monate jeweils einen driftenden Datensatz
 for month in range(1, 13):
     df_new = df_ref.copy()
     # Drift auf Amount_scaled: monatlich um 0.1 erhöhen
@@ -35,19 +33,6 @@ for month in range(1, 13):
     # Speichern
     path = os.path.join(OUTPUT_DIR, f'new_data_month_{month}.csv')
     df_new.to_csv(path, index=False)
-    print(f"  Monat {month:2d} → {path}")
+    print(f"Monat {month:2d} → {path}")
 
-print("\nJetzt kannst du für jeden Monat das drift_detector.py aufrufen:")
-print("Beispiel für Monat 1:")
-print(f"  NEW_DATA_PATH={OUTPUT_DIR}/new_data_month_1.csv python drift_detector.py")
-
-# Optional: automatisch alle Monate durchtesten
-run_all = input("\nMöchtest du jetzt direkt alle 12 Monate testen? (j/N) ")
-if run_all.lower() == 'j':
-    for month in range(1, 13):
-        new_path = f"{OUTPUT_DIR}/new_data_month_{month}.csv"
-        print(f"\n--- Test Monat {month} ---")
-        env = os.environ.copy()
-        env['NEW_DATA_PATH'] = new_path
-        # Hier muss drift_detector.py so programmiert sein, dass es NEW_DATA_PATH liest
-        subprocess.run(['python', 'drift_detector.py'], env=env)
+print("Done: 12 monatliche Datensätze erzeugt.")
