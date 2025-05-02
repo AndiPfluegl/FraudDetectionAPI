@@ -91,6 +91,8 @@ jobs:
 
   deploy:
     needs: build-and-push
+    permissions:
+      contents: write
     runs-on: [self-hosted, Windows]
     env:
       API_TOKEN: ${{ secrets.API_TOKEN }}
@@ -115,7 +117,7 @@ jobs:
             -v "%GITHUB_WORKSPACE%\\data:/app/data" ^
             ghcr.io/andipfluegl/fraud-api:latest
 
-      - name: 🚀 Commit updated latest_data.csv back to repo
+      - name: Commit updated latest_data.csv back to repo
         shell: pwsh
         run: |
           Set-Location $Env:GITHUB_WORKSPACE
