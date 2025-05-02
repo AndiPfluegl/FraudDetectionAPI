@@ -15,7 +15,7 @@ jobs:
   drift:
     runs-on: ubuntu-latest
     outputs:
-      drift-detected: ${{ steps.detect.outputs.drift }}
+      drift: ${{ steps.detect.outputs.drift }}
     steps:
       - uses: actions/checkout@v3
 
@@ -29,7 +29,6 @@ jobs:
           NEW_DATA_PATH: data/latest_data.csv
         run: |
           python drift_detector.py
-          # liest drift_result.json, setzt output
           DRIFT=$(jq .drift_detected drift_result.json)
           echo "drift=$DRIFT" >> $GITHUB_OUTPUT
 
@@ -41,7 +40,8 @@ jobs:
 
   retrain:
     needs: drift
-    if: needs.drift.outputs.drift-detected == 'true' || github.event_name == 'schedule'
+    # korrigierte Bedingung: wenn drift=true ODER geplanter Lauf
+    if: github.event_name == 'push' || needs.drift.outputs.drift == 'true' || github.event_name == 'schedule'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -70,7 +70,8 @@ jobs:
         shell: bash
         env:
           OWNER: ${{ github.repository_owner }}
-        run: echo "OWNER_LC=${OWNER,,}" >> $GITHUB_ENV
+        run: |
+          echo "OWNER_LC=${OWNER,,}" >> $GITHUB_ENV
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v2
@@ -96,6 +97,11 @@ jobs:
       FRAUD_THRESHOLD: "0.4"
       MODEL_PATH: "models/rf_model.pkl"
     steps:
+      # wir brauchen persist-credentials später zum Pushen
+      - uses: actions/checkout@v3
+        with:
+          persist-credentials: true
+
       - name: Pull & restart container locally
         shell: cmd
         run: |
@@ -106,5 +112,18 @@ jobs:
             --env "FRAUD_THRESHOLD=%FRAUD_THRESHOLD%" ^
             --env "MODEL_PATH=%MODEL_PATH%" ^
             -p 5000:5000 ^
-            -v "%GITHUB_WORKSPACE%\data:/app/data" ^
+            -v "%GITHUB_WORKSPACE%\\data:/app/data" ^
             ghcr.io/andipfluegl/fraud-api:latest
+
+      - name: 🚀 Commit updated latest_data.csv back to repo
+        shell: pwsh
+        run: |
+          Set-Location $Env:GITHUB_WORKSPACE
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/latest_data.csv
+          # nur committen, wenn es Änderungen gibt
+          if (-not (git diff --cached --quiet)) {
+            git commit -m "chore: update latest_data.csv with production calls [skip ci]"
+            git push origin main
+          }
