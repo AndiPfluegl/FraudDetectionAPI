@@ -17,40 +17,41 @@ jobs:
   deploy_job:
     runs-on: [self-hosted, Windows]
     steps:
-      - name: Checkout code
+      - name: Checkout Code
         uses: actions/checkout@v3
 
-      - name: Ensure data directory exists on runner
+      - name: Ensure data directory
         shell: pwsh
-        run: New-Item -ItemType Directory -Path "$Env:GITHUB_WORKSPACE\data" -Force
+        run: |
+          New-Item -ItemType Directory -Path "$Env:GITHUB_WORKSPACE\data" -Force
+
+      - name: Seed latest_data.csv from reference_data.csv
+        shell: pwsh
+        run: |
+          Copy-Item `
+            -Path "$Env:GITHUB_WORKSPACE\data\reference_data.csv" `
+            -Destination "$Env:GITHUB_WORKSPACE\data\latest_data.csv" `
+            -Force
 
       - name: Run container with data-volume
         shell: pwsh
         run: |
-          docker rm -f fraud_api || echo "no container to remove"
+          # alten Container entfernen, falls vorhanden
+          docker rm -f fraud_api -ErrorAction SilentlyContinue
+          # Container starten, der das host-Verzeichnis data/ nach /app/data mountet
           docker run -d --name fraud_api `
+            -v "$Env:GITHUB_WORKSPACE\data:/app/data" `
             --env "API_TOKEN=${{ secrets.API_TOKEN }}" `
             --env "FRAUD_THRESHOLD=0.4" `
             --env "MODEL_PATH=models/rf_model.pkl" `
-            -v "$Env:GITHUB_WORKSPACE\data:/app/data" `
             -p 5000:5000 `
             ghcr.io/andipfluegl/fraud-api:latest
-
-      - name: Warm up container with a dummy /predict call
-        # Damit die App die latest_data.csv tatsächlich anlegt
-        shell: bash
-        run: |
-          curl -s -H "Authorization: Bearer ${{ secrets.API_TOKEN }}" \
-               -H "Content-Type: application/json" \
-               -d '{"data":[[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0]]}' \
-               http://localhost:5000/predict || true
 
       - name: Upload latest-data artifact
         uses: actions/upload-artifact@v4
         with:
           name: latest-data
           path: data/latest_data.csv
-
 
   # ───────────────────────────────────────────────────────────────
   # 2) drift_job: Artifact herunterladen, Drift prüfen
