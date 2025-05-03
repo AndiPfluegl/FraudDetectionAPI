@@ -7,6 +7,7 @@ import numpy as np
 from prometheus_flask_exporter import PrometheusMetrics
 from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
 from functools import wraps
+import sqlite3
 from datetime import datetime
 
 # ——— Konfiguration ———
@@ -16,6 +17,7 @@ if not API_TOKEN:
 MODEL_PATH       = os.environ.get("MODEL_PATH", "models/rf_model.pkl")
 FRAUD_THRESHOLD  = float(os.environ.get("FRAUD_THRESHOLD", 0.4))
 LATEST_DATA_PATH = os.environ.get("LATEST_DATA_PATH", "data/latest_data.csv")
+LATEST_DB = os.environ.get("LATEST_DB", "data/requests.db")
 
 # ——— Verzeichnis & Header für latest_data.csv anlegen ———
 os.makedirs(os.path.dirname(LATEST_DATA_PATH), exist_ok=True)
@@ -26,6 +28,16 @@ os.makedirs(os.path.dirname(LATEST_DATA_PATH), exist_ok=True)
 app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+def init_db():
+    conn = sqlite3.connect(LATEST_DB)
+    # erstelle eine Spalte je Feature V1…V28 plus Amount_scaled
+    cols = ", ".join(f"V{i} REAL" for i in range(1,29)) + ", Amount_scaled REAL"
+    conn.execute(f"CREATE TABLE IF NOT EXISTS requests ({cols})")
+    conn.commit()
+    conn.close()
+
+init_db()
 
 # ——— Einfacher Token-Check Decorator ———
 def require_token(f):
@@ -113,14 +125,13 @@ def predict():
         PREDICT_COUNTER.labels(predicted_class=label).inc()
         FRAUD_PROB.observe(p)
 
-    # ==== Logging der Features ins latest_data.csv ====
-    try:
-        with open(LATEST_DATA_PATH, "a", newline="") as f:
-            writer = csv.writer(f)
-            for row in input_data.tolist():
-                writer.writerow(row)
-    except Exception as e:
-        logger.error("Could not write to latest_data.csv: %s", e)
+    # speichere jede Zeile in die SQLite-Tabelle
+    conn = sqlite3.connect(LATEST_DB)
+    for row in input_data.tolist():
+        placeholders = ",".join("?" for _ in row)
+        conn.execute(f"INSERT INTO requests VALUES ({placeholders})", row)
+    conn.commit()
+    conn.close()
     # ===================================================
 
     return jsonify({"fraud_probability": probs.tolist()})

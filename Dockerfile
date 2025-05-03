@@ -19,6 +19,11 @@ FROM python:3.10-slim
 
 WORKDIR /app
 
+# damit sqlite3 CLI & libs drin sind
+RUN apt-get update && \
+    apt-get install -y sqlite3 libsqlite3-0 && \
+    rm -rf /var/lib/apt/lists/*
+
 # 0) Sicherstellen, dass /usr/local/bin im PATH ist
 ENV PATH="/usr/local/bin:${PATH}"
 

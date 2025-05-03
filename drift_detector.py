@@ -3,6 +3,7 @@ import pandas as pd
 from scipy.stats import ks_2samp
 import joblib
 import json
+import sqlite3
 
 # Pfade (ENV zuerst, sonst Default)
 OLD_DATA_PATH = os.environ.get("OLD_DATA_PATH", "data/reference_data.csv")
@@ -17,7 +18,10 @@ FEATURES  = config["features"]
 
 # Daten laden
 old = pd.read_csv(OLD_DATA_PATH)[FEATURES]
-new = pd.read_csv(NEW_DATA_PATH)[FEATURES]
+# neue Daten aus der DB
+conn = sqlite3.connect(NEW_DATA_PATH_DB := os.environ.get("NEW_DATA_PATH_DB", "data/requests.db"))
+new = pd.read_sql_query(f"SELECT {','.join(FEATURES)} FROM requests", conn)
+conn.close()
 
 # KS‑Test für jede Feature‑Spalte
 drifts = {}
