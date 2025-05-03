@@ -26,15 +26,24 @@ jobs:
           docker volume inspect fraud-data -ErrorAction SilentlyContinue `
             || docker volume create fraud-data
 
-      - name: Run container (sammelt DB ins Volume)
+      - name: Run container with data-volume
         shell: pwsh
         run: |
-          docker rm -f fraud_api -ErrorAction SilentlyContinue
+          # Prüfen, ob es einen Container namens fraud_api gibt
+          $cid = docker ps -a --filter "name=fraud_api" --format "{{.ID}}"
+          if ($cid) {
+            Write-Host "Found existing container fraud_api ($cid), removing…"
+            docker rm -f fraud_api
+          } else {
+            Write-Host "No existing fraud_api container"
+          }
+
+          # Jetzt den neuen starten
           docker run -d --name fraud_api `
-            -v fraud-data:/app/data `
+            -v "$Env:GITHUB_WORKSPACE\data:/app/data" `
             --env "API_TOKEN=${{ secrets.API_TOKEN }}" `
             --env "FRAUD_THRESHOLD=0.4" `
-            --env "LATEST_DB=/app/data/requests.db" `
+            --env "MODEL_PATH=models/rf_model.pkl" `
             -p 5000:5000 `
             ghcr.io/andipfluegl/fraud-api:latest
 
