@@ -37,7 +37,7 @@ jobs:
         shell: pwsh
         run: |
           # alten Container entfernen, falls vorhanden
-          docker rm -f fraud_api -ErrorAction SilentlyContinue
+          docker rm -f fraud_api 2>$null
           # Container starten, der das host-Verzeichnis data/ nach /app/data mountet
           docker run -d --name fraud_api `
             -v "$Env:GITHUB_WORKSPACE\data:/app/data" `
