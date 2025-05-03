@@ -17,34 +17,40 @@ jobs:
   deploy_job:
     runs-on: [self-hosted, Windows]
     steps:
-      - name: Checkout repo
+      - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Pull & restart container locally
-        shell: cmd
-        run: |
-          docker pull ghcr.io/andipfluegl/fraud-api:latest
-          docker rm -f fraud_api || echo no container
-          docker run -d --name fraud_api ^
-            --env API_TOKEN=%API_TOKEN% ^
-            --env FRAUD_THRESHOLD=0.4 ^
-            --env MODEL_PATH=models/rf_model.pkl ^
-            -p 5000:5000 ^
-            ghcr.io/andipfluegl/fraud-api:latest
-
-      - name: Ensure data folder
+      - name: Ensure data directory exists on runner
         shell: pwsh
         run: New-Item -ItemType Directory -Path "$Env:GITHUB_WORKSPACE\data" -Force
 
-      - name: Extract latest_data.csv from container
+      - name: Run container with data-volume
         shell: pwsh
-        run: docker cp fraud_api:/app/data/latest_data.csv "$Env:GITHUB_WORKSPACE\data\latest_data.csv"
+        run: |
+          docker rm -f fraud_api || echo "no container to remove"
+          docker run -d --name fraud_api `
+            --env "API_TOKEN=${{ secrets.API_TOKEN }}" `
+            --env "FRAUD_THRESHOLD=0.4" `
+            --env "MODEL_PATH=models/rf_model.pkl" `
+            -v "$Env:GITHUB_WORKSPACE\data:/app/data" `
+            -p 5000:5000 `
+            ghcr.io/andipfluegl/fraud-api:latest
+
+      - name: Warm up container with a dummy /predict call
+        # Damit die App die latest_data.csv tatsächlich anlegt
+        shell: bash
+        run: |
+          curl -s -H "Authorization: Bearer ${{ secrets.API_TOKEN }}" \
+               -H "Content-Type: application/json" \
+               -d '{"data":[[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0]]}' \
+               http://localhost:5000/predict || true
 
       - name: Upload latest-data artifact
         uses: actions/upload-artifact@v4
         with:
           name: latest-data
           path: data/latest_data.csv
+
 
   # ───────────────────────────────────────────────────────────────
   # 2) drift_job: Artifact herunterladen, Drift prüfen
