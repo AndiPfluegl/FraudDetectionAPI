@@ -19,6 +19,14 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
+      # 0) Versuch, das letzte latest_data.csv als Artifact herunterzuladen
+      - name: Download latest_data artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: latest-data
+          path: data
+        continue-on-error: true   # beim ersten Lauf existiert das Artifact noch nicht
+
       - name: Install drift dependencies
         run: pip install pandas scipy joblib
 
@@ -40,7 +48,6 @@ jobs:
 
   retrain:
     needs: drift
-    # wenn drift=true ODER geplanter Lauf
     if: github.event_name == 'push' || needs.drift.outputs.drift == 'true' || github.event_name == 'schedule'
     runs-on: ubuntu-latest
     steps:
@@ -92,34 +99,17 @@ jobs:
   deploy:
     needs: build-and-push
     permissions:
-      contents: write     # damit der Action-Bot pushen darf
+      contents: write    # brauchen wir, damit wir committen dürfen
     runs-on: [self-hosted, Windows]
     env:
-      API_TOKEN:       ${{ secrets.API_TOKEN }}
+      API_TOKEN: ${{ secrets.API_TOKEN }}
       FRAUD_THRESHOLD: "0.4"
-      MODEL_PATH:      "models/rf_model.pkl"
-
+      MODEL_PATH: "models/rf_model.pkl"
     steps:
-      # 1) Checkout mit Persist-Credentials, damit wir später pushen dürfen
       - uses: actions/checkout@v3
         with:
           persist-credentials: true
 
-      # 2) Stelle sicher, dass das data-Verzeichnis und die Datei existieren
-      - name: Prepare host data folder
-        shell: pwsh
-        run: |
-          $folder = "$Env:GITHUB_WORKSPACE\data"
-          if (-not (Test-Path $folder)) {
-            New-Item -ItemType Directory -Path $folder | Out-Null
-          }
-          $file = "$folder\latest_data.csv"
-          if (-not (Test-Path $file)) {
-            # lege eine leere CSV an, damit das Volume kein leeres Verzeichnis over­layt
-            New-Item -ItemType File -Path $file | Out-Null
-          }
-
-      # 3) Container pullen und mit Volume mount starten
       - name: Pull & restart container locally
         shell: cmd
         run: |
@@ -130,19 +120,17 @@ jobs:
             --env "FRAUD_THRESHOLD=%FRAUD_THRESHOLD%" ^
             --env "MODEL_PATH=%MODEL_PATH%" ^
             -p 5000:5000 ^
-            -v "%GITHUB_WORKSPACE%\data:/app/data" ^
+            -v "%GITHUB_WORKSPACE%\\data:/app/data" ^
             ghcr.io/andipfluegl/fraud-api:latest
 
-      # 4) Commit der geänderten latest_data.csv (falls sich wirklich etwas geändert hat)
-      - name: Commit updated latest_data.csv back to repo
+      # 1) Stelle sicher, dass data-Ordner im Repo existiert
+      - name: Ensure data directory
         shell: pwsh
         run: |
-          Set-Location $Env:GITHUB_WORKSPACE
-          git config user.name  "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/latest_data.csv
-          if (-not (git diff --cached --quiet)) {
-            git commit -m "chore: update latest_data.csv with production calls [skip ci]"
-            git push origin main
-          }
+          New-Item -ItemType Directory -Path "$Env:GITHUB_WORKSPACE\data" -Force | Out-Null
 
+      # 2) Kopiere latest_data.csv aus dem Container ins Repo
+      - name: Extract latest_data.csv from container
+        shell: pwsh
+        run: |
+          docker cp fraud_api:/app/data/latest_data.csv "$Env:GITHUB_WORKSPACE\data\latest_data.csv"
