@@ -40,7 +40,7 @@ jobs:
 
   retrain:
     needs: drift
-    # korrigierte Bedingung: wenn drift=true ODER geplanter Lauf
+    # wenn drift=true ODER geplanter Lauf
     if: github.event_name == 'push' || needs.drift.outputs.drift == 'true' || github.event_name == 'schedule'
     runs-on: ubuntu-latest
     steps:
@@ -95,11 +95,11 @@ jobs:
       contents: write
     runs-on: [self-hosted, Windows]
     env:
-      API_TOKEN: ${{ secrets.API_TOKEN }}
+      API_TOKEN:   ${{ secrets.API_TOKEN }}
       FRAUD_THRESHOLD: "0.4"
-      MODEL_PATH: "models/rf_model.pkl"
+      MODEL_PATH:  "models/rf_model.pkl"
     steps:
-      # wir brauchen persist-credentials später zum Pushen
+      # Checkout mit Persist-Credentials, damit wir später pushen dürfen
       - uses: actions/checkout@v3
         with:
           persist-credentials: true
@@ -108,20 +108,27 @@ jobs:
         shell: cmd
         run: |
           docker pull ghcr.io/andipfluegl/fraud-api:latest
-          docker rm -f fraud_api || echo No existing container
+          docker rm -f fraud_api  || echo No existing container
           docker run -d --name fraud_api ^
             --env "API_TOKEN=%API_TOKEN%" ^
             --env "FRAUD_THRESHOLD=%FRAUD_THRESHOLD%" ^
             --env "MODEL_PATH=%MODEL_PATH%" ^
             -p 5000:5000 ^
-            -v "%GITHUB_WORKSPACE%\\data:/app/data" ^
             ghcr.io/andipfluegl/fraud-api:latest
+
+      - name: Extract latest_data.csv from container
+        shell: pwsh
+        run: |
+          # Stelle sicher, dass das Ziel-Verzeichnis existiert
+          New-Item -ItemType Directory -Path "$Env:GITHUB_WORKSPACE\data" -Force | Out-Null
+          # Kopiere die Datei aus dem Container in dein Repo
+          docker cp fraud_api:/app/data/latest_data.csv "$Env:GITHUB_WORKSPACE\data\latest_data.csv"
 
       - name: Commit updated latest_data.csv back to repo
         shell: pwsh
         run: |
           Set-Location $Env:GITHUB_WORKSPACE
-          git config user.name "github-actions[bot]"
+          git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add data/latest_data.csv
           # nur committen, wenn es Änderungen gibt
