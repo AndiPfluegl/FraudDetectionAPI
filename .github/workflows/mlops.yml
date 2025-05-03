@@ -92,38 +92,48 @@ jobs:
   deploy:
     needs: build-and-push
     permissions:
-      contents: write
+      contents: write     # damit der Action-Bot pushen darf
     runs-on: [self-hosted, Windows]
     env:
-      API_TOKEN:   ${{ secrets.API_TOKEN }}
+      API_TOKEN:       ${{ secrets.API_TOKEN }}
       FRAUD_THRESHOLD: "0.4"
-      MODEL_PATH:  "models/rf_model.pkl"
+      MODEL_PATH:      "models/rf_model.pkl"
+
     steps:
-      # Checkout mit Persist-Credentials, damit wir später pushen dürfen
+      # 1) Checkout mit Persist-Credentials, damit wir später pushen dürfen
       - uses: actions/checkout@v3
         with:
           persist-credentials: true
 
+      # 2) Stelle sicher, dass das data-Verzeichnis und die Datei existieren
+      - name: Prepare host data folder
+        shell: pwsh
+        run: |
+          $folder = "$Env:GITHUB_WORKSPACE\data"
+          if (-not (Test-Path $folder)) {
+            New-Item -ItemType Directory -Path $folder | Out-Null
+          }
+          $file = "$folder\latest_data.csv"
+          if (-not (Test-Path $file)) {
+            # lege eine leere CSV an, damit das Volume kein leeres Verzeichnis over­layt
+            New-Item -ItemType File -Path $file | Out-Null
+          }
+
+      # 3) Container pullen und mit Volume mount starten
       - name: Pull & restart container locally
         shell: cmd
         run: |
           docker pull ghcr.io/andipfluegl/fraud-api:latest
-          docker rm -f fraud_api  || echo No existing container
+          docker rm -f fraud_api || echo No existing container
           docker run -d --name fraud_api ^
             --env "API_TOKEN=%API_TOKEN%" ^
             --env "FRAUD_THRESHOLD=%FRAUD_THRESHOLD%" ^
             --env "MODEL_PATH=%MODEL_PATH%" ^
             -p 5000:5000 ^
+            -v "%GITHUB_WORKSPACE%\data:/app/data" ^
             ghcr.io/andipfluegl/fraud-api:latest
 
-      - name: Extract latest_data.csv from container
-        shell: pwsh
-        run: |
-          # Stelle sicher, dass das Ziel-Verzeichnis existiert
-          New-Item -ItemType Directory -Path "$Env:GITHUB_WORKSPACE\data" -Force | Out-Null
-          # Kopiere die Datei aus dem Container in dein Repo
-          docker cp fraud_api:/app/data/latest_data.csv "$Env:GITHUB_WORKSPACE\data\latest_data.csv"
-
+      # 4) Commit der geänderten latest_data.csv (falls sich wirklich etwas geändert hat)
       - name: Commit updated latest_data.csv back to repo
         shell: pwsh
         run: |
@@ -131,8 +141,8 @@ jobs:
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add data/latest_data.csv
-          # nur committen, wenn es Änderungen gibt
           if (-not (git diff --cached --quiet)) {
             git commit -m "chore: update latest_data.csv with production calls [skip ci]"
             git push origin main
           }
+
