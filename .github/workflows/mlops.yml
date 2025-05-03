@@ -134,3 +134,10 @@ jobs:
         shell: pwsh
         run: |
           docker cp fraud_api:/app/data/latest_data.csv "$Env:GITHUB_WORKSPACE\data\latest_data.csv"
+
+      # 3) Upload latest_data.csv als GitHub-Artifact
+      - name: Upload latest_data.csv artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: latest-data
+          path: data/latest_data.csv
