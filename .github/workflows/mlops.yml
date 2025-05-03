@@ -15,33 +15,33 @@ jobs:
   # ───────────────────────────────────────────────────────────────
   # 1) deploy_job: deployt den Container, extrahiert latest_data.csv
   #    und lädt sie als „latest-data“-Artifact hoch.
-  deploy_job:
+  deploy:
+    needs: build-and-push
     runs-on: [self-hosted, Windows]
+    permissions:
+      contents: write
+    env:
+      API_TOKEN: ${{ secrets.API_TOKEN }}
+      FRAUD_THRESHOLD: "0.4"
+      MODEL_PATH: "models/rf_model.pkl"
     steps:
+      - uses: actions/checkout@v3
+        with:
+          persist-credentials: true
+
       - name: Pull & restart container locally
+        shell: cmd
         run: |
           docker pull ghcr.io/andipfluegl/fraud-api:latest
-          docker rm -f fraud_api || echo "no container"
-          docker run -d --name fraud_api \
-            --env "API_TOKEN=${{ secrets.API_TOKEN }}" \
-            --env "FRAUD_THRESHOLD=0.4" \
-            --env "MODEL_PATH=models/rf_model.pkl" \
-            -p 5000:5000 \
+          docker rm -f fraud_api || echo No existing container
+          docker run -d --name fraud_api ^
+            --env "API_TOKEN=%API_TOKEN%" ^
+            --env "FRAUD_THRESHOLD=%FRAUD_THRESHOLD%" ^
+            --env "MODEL_PATH=%MODEL_PATH%" ^
+            -p 5000:5000 ^
+            -v "%GITHUB_WORKSPACE%\data:/app/data" ^
             ghcr.io/andipfluegl/fraud-api:latest
 
-      - name: Ensure data folder
-        run: |
-          New-Item -ItemType Directory -Path "$Env:GITHUB_WORKSPACE\data" -Force
-
-      - name: Extract latest_data.csv from container
-        run: |
-          docker cp fraud_api:/app/data/latest_data.csv "$Env:GITHUB_WORKSPACE\data\latest_data.csv"
-
-      - name: Upload latest-data artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: latest-data
-          path: data/latest_data.csv
 
   # ───────────────────────────────────────────────────────────────
   # 2) drift_job: zieht das „latest-data“-Artifact, führt Drift-Detection
@@ -132,6 +132,7 @@ jobs:
           tags: |
             ghcr.io/${{ env.OWNER_LC }}/fraud-api:latest
             ghcr.io/${{ env.OWNER_LC }}/fraud-api:${{ github.sha }}
+
 
   # ───────────────────────────────────────────────────────────────
   # 5) final deploy (optional, wie gehabt wieder aufself-hosted)
