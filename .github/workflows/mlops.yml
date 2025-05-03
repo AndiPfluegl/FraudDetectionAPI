@@ -1,9 +1,5 @@
 name: MLOps Pipeline
 
-permissions:
-  contents: read
-  packages: write
-
 on:
   push:
     branches: [main]
@@ -11,24 +7,63 @@ on:
   schedule:
     - cron: '0 0 1 * *'  # monatlich am 1. um 00:00 UTC
 
+permissions:
+  contents: read
+  packages: write
+
 jobs:
-  drift:
+  # ───────────────────────────────────────────────────────────────
+  # 1) deploy_job: Container deployen, latest_data.csv extrahieren
+  deploy_job:
+    runs-on: [self-hosted, Windows]
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Pull & restart container locally
+        shell: cmd
+        run: |
+          docker pull ghcr.io/andipfluegl/fraud-api:latest
+          docker rm -f fraud_api || echo no container
+          docker run -d --name fraud_api ^
+            --env API_TOKEN=%API_TOKEN% ^
+            --env FRAUD_THRESHOLD=0.4 ^
+            --env MODEL_PATH=models/rf_model.pkl ^
+            -p 5000:5000 ^
+            ghcr.io/andipfluegl/fraud-api:latest
+
+      - name: Ensure data folder
+        shell: pwsh
+        run: New-Item -ItemType Directory -Path "$Env:GITHUB_WORKSPACE\data" -Force
+
+      - name: Extract latest_data.csv from container
+        shell: pwsh
+        run: docker cp fraud_api:/app/data/latest_data.csv "$Env:GITHUB_WORKSPACE\data\latest_data.csv"
+
+      - name: Upload latest-data artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: latest-data
+          path: data/latest_data.csv
+
+  # ───────────────────────────────────────────────────────────────
+  # 2) drift_job: Artifact herunterladen, Drift prüfen
+  drift_job:
+    needs: deploy_job
     runs-on: ubuntu-latest
     outputs:
       drift: ${{ steps.detect.outputs.drift }}
     steps:
       - uses: actions/checkout@v3
 
-      # 0) Versuch, das letzte latest_data.csv als Artifact herunterzuladen
-      - name: Download latest_data artifact
+      - name: Download latest-data artifact
         uses: actions/download-artifact@v4
         with:
           name: latest-data
           path: data
-        continue-on-error: true   # beim ersten Lauf existiert das Artifact noch nicht
 
-      - name: Install drift dependencies
-        run: pip install pandas scipy joblib
+      - name: Install drift deps
+        run: pip install pandas scipy joblib jq
 
       - name: Run drift detection
         id: detect
@@ -46,14 +81,16 @@ jobs:
           name: drift-result
           path: drift_result.json
 
-  retrain:
-    needs: drift
-    if: github.event_name == 'push' || needs.drift.outputs.drift == 'true' || github.event_name == 'schedule'
+  # ───────────────────────────────────────────────────────────────
+  # 3) retrain_job: Nur bei drift=true oder geplant ausführen
+  retrain_job:
+    needs: drift_job
+    if: needs.drift_job.outputs.drift == 'true' || github.event_name == 'schedule'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
 
-      - name: Install retrain dependencies
+      - name: Install retrain deps
         run: pip install -r requirements.txt mlflow
 
       - name: Retrain model on latest data
@@ -67,20 +104,19 @@ jobs:
           name: model-artifact
           path: models/rf_model.pkl
 
+  # ───────────────────────────────────────────────────────────────
+  # 4) build-and-push: Image bauen & pushen
   build-and-push:
-    needs: retrain
+    needs: retrain_job
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
 
-      - name: Set lowercase owner name
+      - name: Set lowercase owner
         shell: bash
-        env:
-          OWNER: ${{ github.repository_owner }}
-        run: |
-          echo "OWNER_LC=${OWNER,,}" >> $GITHUB_ENV
+        run: echo "OWNER_LC=${{ toLower(github.repository_owner) }}" >> $GITHUB_ENV
 
-      - name: Log in to GitHub Container Registry
+      - name: Login to GHCR
         uses: docker/login-action@v2
         with:
           registry: ghcr.io
@@ -96,48 +132,23 @@ jobs:
             ghcr.io/${{ env.OWNER_LC }}/fraud-api:latest
             ghcr.io/${{ env.OWNER_LC }}/fraud-api:${{ github.sha }}
 
-  deploy:
+  # ───────────────────────────────────────────────────────────────
+  # 5) deploy_final: Finale Freigabe auf deinem Self-Hosted Host
+  deploy_final:
     needs: build-and-push
-    permissions:
-      contents: write    # brauchen wir, damit wir committen dürfen
     runs-on: [self-hosted, Windows]
-    env:
-      API_TOKEN: ${{ secrets.API_TOKEN }}
-      FRAUD_THRESHOLD: "0.4"
-      MODEL_PATH: "models/rf_model.pkl"
     steps:
-      - uses: actions/checkout@v3
-        with:
-          persist-credentials: true
+      - name: Checkout repo
+        uses: actions/checkout@v3
 
       - name: Pull & restart container locally
         shell: cmd
         run: |
           docker pull ghcr.io/andipfluegl/fraud-api:latest
-          docker rm -f fraud_api || echo No existing container
+          docker rm -f fraud_api || echo no container
           docker run -d --name fraud_api ^
-            --env "API_TOKEN=%API_TOKEN%" ^
-            --env "FRAUD_THRESHOLD=%FRAUD_THRESHOLD%" ^
-            --env "MODEL_PATH=%MODEL_PATH%" ^
+            --env API_TOKEN=%API_TOKEN% ^
+            --env FRAUD_THRESHOLD=0.4 ^
+            --env MODEL_PATH=models/rf_model.pkl ^
             -p 5000:5000 ^
-            -v "%GITHUB_WORKSPACE%\\data:/app/data" ^
             ghcr.io/andipfluegl/fraud-api:latest
-
-      # 1) Stelle sicher, dass data-Ordner im Repo existiert
-      - name: Ensure data directory
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Path "$Env:GITHUB_WORKSPACE\data" -Force | Out-Null
-
-      # 2) Kopiere latest_data.csv aus dem Container ins Repo
-      - name: Extract latest_data.csv from container
-        shell: pwsh
-        run: |
-          docker cp fraud_api:/app/data/latest_data.csv "$Env:GITHUB_WORKSPACE\data\latest_data.csv"
-
-      # 3) Upload latest_data.csv als GitHub-Artifact
-      - name: Upload latest_data.csv artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: latest-data
-          path: data/latest_data.csv
