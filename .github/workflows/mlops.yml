@@ -114,8 +114,12 @@ jobs:
 
       - name: Set lowercase owner
         shell: bash
-        run: echo "OWNER_LC=${{ toLower(github.repository_owner) }}" >> $GITHUB_ENV
-
+        env:
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          # Bash-Parameter-Expansion um lowercase zu erhalten
+          OWNER_LC="${OWNER,,}"
+          echo "OWNER_LC=$OWNER_LC" >> $GITHUB_ENV
       - name: Login to GHCR
         uses: docker/login-action@v2
         with:
