@@ -29,11 +29,11 @@ jobs:
       - name: Copy SQLite DB from persistent volume
         shell: pwsh
         run: |
-          # Volume fraud-data an C:\mnt mounten und DB ins Workspace kopieren
           docker run --rm `
-            -v fraud-data:C:/mnt `
-            mcr.microsoft.com/windows/nanoserver:1809 `
-            powershell -Command "Copy-Item C:\mnt\requests.db C:\github\workspace\data\requests.db"
+            -v fraud-data:/mnt `
+            -v "${Env:GITHUB_WORKSPACE}/data":/workspace/data `
+            alpine:latest `
+            sh -c "cp /mnt/requests.db /workspace/data/requests.db"
 
       - name: Upload latest-db artifact
         uses: actions/upload-artifact@v4
