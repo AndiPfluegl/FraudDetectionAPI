@@ -69,7 +69,7 @@ jobs:
           OLD_DATA_DB: data/reference_data.db   # Du musst reference_data.db einmalig ins Repo legen
           NEW_DATA_DB: data/requests.db
         run: |
-          python drift_detector_sqlite.py
+          python drift_detector.py
           DRIFT=$(jq .drift_detected drift_result.json)
           echo "drift=$DRIFT" >> $GITHUB_OUTPUT
 
