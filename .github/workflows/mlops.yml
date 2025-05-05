@@ -58,7 +58,10 @@ jobs:
           path: data
 
       - name: Install drift deps
-        run: pip install pandas scipy sqlalchemy sqlite3 jq
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq
+          pip install pandas scipy sqlalchemy
 
       - name: Run drift detection
         id: detect
