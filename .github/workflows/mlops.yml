@@ -42,6 +42,7 @@ jobs:
           docker run -d --name fraud_api `
             -v "$Env:GITHUB_WORKSPACE\data:/app/data" `
             --env "API_TOKEN=${{ secrets.API_TOKEN }}" `
+            --env "LATEST_DB=/app/data/requests.db" `
             --env "FRAUD_THRESHOLD=0.4" `
             --env "MODEL_PATH=models/rf_model.pkl" `
             -p 5000:5000 `
