@@ -31,7 +31,7 @@ jobs:
         run: |
           docker run --rm `
             -v fraud-data:/mnt `
-            -v "${Env:GITHUB_WORKSPACE}/data":/workspace/data `
+            -v "$Env:GITHUB_WORKSPACE\data:/workspace/data" `
             alpine:latest `
             sh -c "cp /mnt/requests.db /workspace/data/requests.db"
 
