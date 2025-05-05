@@ -15,7 +15,7 @@ jobs:
   # ───────────────────────────────────────────────────────────────
   # 1) deploy_job: Container deployen, requests.db aus Volume extrahieren
   deploy_job:
-    runs-on: [self-hosted, Windows]
+    runs-on: [ self-hosted, Windows ]
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
@@ -26,32 +26,14 @@ jobs:
           docker volume inspect fraud-data -ErrorAction SilentlyContinue `
             || docker volume create fraud-data
 
-      - name: Run container with data-volume
+      - name: Copy SQLite DB from persistent volume
         shell: pwsh
         run: |
-          # Prüfen, ob es einen Container namens fraud_api gibt
-          $cid = docker ps -a --filter "name=fraud_api" --format "{{.ID}}"
-          if ($cid) {
-            Write-Host "Found existing container fraud_api ($cid), removing…"
-            docker rm -f fraud_api
-          } else {
-            Write-Host "No existing fraud_api container"
-          }
-
-          # Jetzt den neuen starten
-          docker run -d --name fraud_api `
-            -v "$Env:GITHUB_WORKSPACE\data:/app/data" `
-            --env "API_TOKEN=${{ secrets.API_TOKEN }}" `
-            --env "LATEST_DB=/app/data/requests.db" `
-            --env "FRAUD_THRESHOLD=0.4" `
-            --env "MODEL_PATH=models/rf_model.pkl" `
-            -p 5000:5000 `
-            ghcr.io/andipfluegl/fraud-api:latest
-
-      - name: Extract SQLite DB
-        shell: pwsh
-        run: |
-          docker cp fraud_api:/app/data/requests.db "$Env:GITHUB_WORKSPACE\data\requests.db"
+          # Volume fraud-data an C:\mnt mounten und DB ins Workspace kopieren
+          docker run --rm `
+            -v fraud-data:C:/mnt `
+            mcr.microsoft.com/windows/nanoserver:1809 `
+            powershell -Command "Copy-Item C:\mnt\requests.db C:\github\workspace\data\requests.db"
 
       - name: Upload latest-db artifact
         uses: actions/upload-artifact@v4
