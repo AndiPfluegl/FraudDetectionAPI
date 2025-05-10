@@ -24,9 +24,19 @@ jobs:
         run: |
           docker volume inspect fraud-data -ErrorAction SilentlyContinue `
             || docker volume create fraud-data
+      - name: Unblock PowerShell scripts
+        shell: pwsh
+        run: Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install CSV import requirements
+        run: pip install pandas
 
       - name: Build requests.db from CSV
-        shell: pwsh
         run: python import_csv_to_sqlite.py
 
       - name: Upload latest-db artifact
