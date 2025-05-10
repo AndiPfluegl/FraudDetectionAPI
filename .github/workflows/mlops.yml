@@ -144,7 +144,9 @@ jobs:
   # 5) deploy_final: Finale Freigabe mit Volume-Mount
   deploy_final:
     needs: build-and-push
-    runs-on: [self-hosted, Windows]
+    runs-on: [ self-hosted, Windows ]
+    env:
+      API_TOKEN: ${{ secrets.API_TOKEN }}
     steps:
       - name: Pull & restart container locally
         shell: cmd
