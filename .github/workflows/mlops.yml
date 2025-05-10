@@ -66,7 +66,7 @@ jobs:
       - name: Run drift detection
         id: detect
         env:
-          OLD_DATA_DB: data/reference_data.db   # Du musst reference_data.db einmalig ins Repo legen
+          OLD_DATA_DB: data/reference_data.db
           NEW_DATA_DB: data/requests.db
         run: |
           python drift_detector.py
@@ -108,8 +108,31 @@ jobs:
           name: model-artifact
           path: models/rf_model.pkl
 
+  # 4) update_reference: neue requests.db als reference_data.db speichern
+  update_reference:
+    needs: retrain_job
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Download latest-db artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: latest-db
+          path: data
+
+      - name: Rename for reference
+        run: |
+          mv data/requests.db data/reference_data.db
+
+      - name: Upload new reference-data artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: reference-data
+          path: data/reference_data.db
+
   # ───────────────────────────────────────────────────────────────
-  # 4) build-and-push: Image bauen & pushen
+  # 5) build-and-push: Image bauen & pushen
   build-and-push:
     needs: retrain_job
     runs-on: ubuntu-latest
@@ -141,7 +164,7 @@ jobs:
             ghcr.io/${{ env.OWNER_LC }}/fraud-api:${{ github.sha }}
 
   # ───────────────────────────────────────────────────────────────
-  # 5) deploy_final: Finale Freigabe mit Volume-Mount
+  # 6) deploy_final: Finale Freigabe mit Volume-Mount
   deploy_final:
     needs: build-and-push
     runs-on: [ self-hosted, Windows ]
