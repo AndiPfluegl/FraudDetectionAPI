@@ -17,27 +17,19 @@ jobs:
   deploy_job:
     runs-on: [ self-hosted, Windows ]
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout Code
+        uses: actions/checkout@v3
 
       - name: Ensure Docker volume exists
         shell: pwsh
         run: |
           docker volume inspect fraud-data -ErrorAction SilentlyContinue `
             || docker volume create fraud-data
-      - name: Unblock PowerShell scripts
-        shell: pwsh
-        run: Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.9'
-
-      - name: Install CSV import requirements
-        run: pip install pandas
 
       - name: Build requests.db from CSV
-        run: python import_csv_to_sqlite.py
+        shell: pwsh
+        run: |
+          & .\.venv\Scripts\python.exe import_csv_to_sqlite.py
 
       - name: Upload latest-db artifact
         uses: actions/upload-artifact@v4
