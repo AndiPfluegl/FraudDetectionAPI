@@ -18,9 +18,10 @@ conn = sqlite3.connect(TRAIN_DB)
 df = pd.read_sql_query("SELECT * FROM requests", conn)
 conn.close()
 
-# If 'score' column present, drop rows without score
-if "score" in df.columns:
-    df = df.dropna(subset=["score"])
+# Filter: keep rows with either Class or score
+has_class = "Class" in df.columns and df["Class"].notna()
+has_score = "score" in df.columns and df["score"].notna()
+df = df[has_class | has_score]
 
 # Features and labels
 feature_cols = [col for col in df.columns if col.startswith("V")] + ["Amount_scaled"]
@@ -28,7 +29,8 @@ X = df[feature_cols]
 
 # Determine labels: use Class if present, else derive from score
 if "Class" in df.columns:
-    y = df["Class"]
+    y = df["Class"].where(df["Class"].notna(),
+                          (df["score"] >= FRAUD_THRESHOLD).astype(int))
 else:
     if "score" not in df.columns:
         raise ValueError("No 'score' column found to derive labels from.")
@@ -36,7 +38,9 @@ else:
 
 # Ensure there is more than one class for stratification
 if len(pd.unique(y)) < 2:
-    raise ValueError("Not enough class diversity for stratified split. Check your score thresholds or data.")
+    raise ValueError(
+        "Not enough class diversity for stratified split. Check your score thresholds or data."
+    )
 
 # Train/Test split
 X_train, X_test, y_train, y_test = train_test_split(
