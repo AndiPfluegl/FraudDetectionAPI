@@ -88,6 +88,12 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
+      - name: Download latest-db artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: latest-db
+          path: data
+
       - name: Install retrain deps
         run: pip install -r requirements.txt mlflow sqlalchemy
 
