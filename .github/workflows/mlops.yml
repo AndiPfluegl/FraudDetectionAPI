@@ -26,14 +26,10 @@ jobs:
           docker volume inspect fraud-data -ErrorAction SilentlyContinue `
             || docker volume create fraud-data
 
-      - name: Copy SQLite DB from persistent volume
+      - name: Build requests.db from CSV
         shell: pwsh
         run: |
-          docker run --rm `
-            -v fraud-data:/mnt `
-            -v "$Env:GITHUB_WORKSPACE\data:/workspace/data" `
-            alpine:latest `
-            sh -c "cp /mnt/requests.db /workspace/data/requests.db"
+          & .\.venv\Scripts\python.exe import_csv_to_sqlite.py
 
       - name: Upload latest-db artifact
         uses: actions/upload-artifact@v4
