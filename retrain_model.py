@@ -15,21 +15,28 @@ FRAUD_THRESHOLD = float(os.environ.get("FRAUD_THRESHOLD", 0.5))
 
 # Load data from SQLite
 conn = sqlite3.connect(TRAIN_DB)
-# requests table should contain V1..V28, Amount_scaled, score, ts
 df = pd.read_sql_query("SELECT * FROM requests", conn)
 conn.close()
 
-# Features
+# If 'score' column present, drop rows without score
+if "score" in df.columns:
+    df = df.dropna(subset=["score"])
+
+# Features and labels
 feature_cols = [col for col in df.columns if col.startswith("V")] + ["Amount_scaled"]
 X = df[feature_cols]
 
-# Labels: use actual Class if available, otherwise derive from score threshold
+# Determine labels: use Class if present, else derive from score
 if "Class" in df.columns:
     y = df["Class"]
 else:
     if "score" not in df.columns:
         raise ValueError("No 'score' column found to derive labels from.")
     y = (df["score"] >= FRAUD_THRESHOLD).astype(int)
+
+# Ensure there is more than one class for stratification
+if len(pd.unique(y)) < 2:
+    raise ValueError("Not enough class diversity for stratified split. Check your score thresholds or data.")
 
 # Train/Test split
 X_train, X_test, y_train, y_test = train_test_split(
