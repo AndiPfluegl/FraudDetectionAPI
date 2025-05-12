@@ -138,25 +138,22 @@ jobs:
   # 4) update_reference: neue requests.db als reference_data.db speichern
   update_reference:
     needs: retrain_job
-    runs-on: ubuntu-latest
+    runs-on: [ self-hosted, Windows ]
     steps:
-      - uses: actions/checkout@v3
-
-      - name: Download latest-db artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: latest-db
-          path: data
-
-      - name: Rename for reference
+      - name: Ensure reference volume exists
+        shell: pwsh
         run: |
-          mv data/requests.db data/reference_data.db
+          docker volume inspect fraud-reference -ErrorAction SilentlyContinue `
+            || docker volume create fraud-reference
 
-      - name: Upload new reference-data artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: reference-data
-          path: data/reference_data.db
+      - name: Update reference volume from latest data
+        shell: pwsh
+        run: |
+          docker run --rm `
+            -v fraud-data:/mnt_data `
+            -v fraud-reference:/mnt_ref `
+            alpine:latest `
+            sh -c "cp /mnt_data/requests.db /mnt_ref/reference_data.db"
 
   # ───────────────────────────────────────────────────────────────
   # 5) build-and-push: Image bauen & pushen
