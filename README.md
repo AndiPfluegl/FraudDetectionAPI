@@ -8,7 +8,7 @@ Project Structure
 ├── import_csv_to_sqlite.py    # Utility: build initial reference DB from CSV
 ├── drift_detector.py          # KS‑test based data drift detector
 ├── retrain_model.py           # Retrain RandomForest on SQLite data
-├── docker/                    # Docker assets (Dockerfile, entrypoint)
+├── Dockerfile                 # Dockerfile
 ├── .github/workflows/         # CI/CD pipeline definitions
 │   └── mlops.yml
 ├── data/
