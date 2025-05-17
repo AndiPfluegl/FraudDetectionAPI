@@ -1,3 +1,9 @@
+"""
+GitHub Actions MLOps Pipeline for Fraud Detection Service
+
+Trigger on push to main, manual dispatch, or monthly schedule
+"""
+
 name: MLOps Pipeline
 
 on:
@@ -5,15 +11,16 @@ on:
     branches: [main]
   workflow_dispatch:
   schedule:
-    - cron: '0 0 1 * *'  # monatlich am 1. um 00:00 UTC
+    - cron: '0 0 1 * *'  # # Every month on the first day at midnight UTC
+
 
 permissions:
-  contents: read
-  packages: write
+  contents: read # allow checking out code
+  packages: write # allow pushing Docker images (GHCR)
 
 jobs:
   # ───────────────────────────────────────────────────────────────
-  # 1) deploy_job: Container deployen, requests.db aus Volume extrahieren
+  # 1) deploy_job: Extract current DBs from Docker volumes into workspace
   deploy_job:
     runs-on: [ self-hosted, Windows ]
     steps:
@@ -63,7 +70,7 @@ jobs:
           path: data/requests.db
 
   # ───────────────────────────────────────────────────────────────
-  # 2) drift_job: zieht die DB, führt Drift-Detection via sqlite aus
+  # 2) drift_job: Download DBs and run data drift detection
   drift_job:
     needs: deploy_job
     runs-on: ubuntu-latest
@@ -107,7 +114,7 @@ jobs:
           path: drift_result.json
 
   # ───────────────────────────────────────────────────────────────
-  # 3) retrain_job: Nur bei drift=true oder geplant ausführen
+  # 3) retrain_job: Retrain model if drift detected or on schedule
   retrain_job:
     needs: drift_job
     if: needs.drift_job.outputs.drift == 'true' || github.event_name == 'schedule'
@@ -134,8 +141,8 @@ jobs:
         with:
           name: model-artifact
           path: models/rf_model.pkl
-
-  # 4) update_reference: neue requests.db als reference_data.db speichern
+  # ───────────────────────────────────────────────────────────────
+  # 4) update_reference: Overwrite reference volume after retraining
   update_reference:
     needs: retrain_job
     runs-on: [ self-hosted, Windows ]
@@ -156,7 +163,7 @@ jobs:
             sh -c "cp /mnt_data/requests.db /mnt_ref/reference_data.db"
 
   # ───────────────────────────────────────────────────────────────
-  # 5) build-and-push: Image bauen & pushen
+  # 5) build-and-push: Build Docker image and push to GHCR
   build-and-push:
     needs: retrain_job
     runs-on: ubuntu-latest
@@ -188,7 +195,7 @@ jobs:
             ghcr.io/${{ env.OWNER_LC }}/fraud-api:${{ github.sha }}
 
   # ───────────────────────────────────────────────────────────────
-  # 6) deploy_final: Finale Freigabe mit Volume-Mount
+  # 6) deploy_final: Deploy updated service locally
   deploy_final:
     needs: build-and-push
     runs-on: [ self-hosted, Windows ]

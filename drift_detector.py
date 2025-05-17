@@ -1,50 +1,61 @@
+"""
+Drift Detector
+
+This script compares feature distributions between a reference dataset and new data
+using the two-sample Kolmogorov-Smirnov test. It writes a JSON result indicating
+whether any feature shows a p-value below the configured threshold.
+"""
 import os
+import json
+import sqlite3
 import pandas as pd
 from scipy.stats import ks_2samp
-import sqlite3
-import json
 
-# Unterstütze beide ENV-Namen für Referenz und Neu
-OLD_DATA_PATH = (
-    os.environ.get("OLD_DATA_PATH")
-    or os.environ.get("OLD_DATA_DB")
-    or "data/reference_data.csv"
-)
-NEW_DATA_PATH = (
-    os.environ.get("NEW_DATA_PATH")
-    or os.environ.get("NEW_DATA_DB")
-    or "data/requests.db"
-)
-DRIFT_CONFIG  = os.environ.get("DRIFT_CONFIG", "drift_config.json")
+# --- Configuration ---
+# Path to the reference data (SQLite DB)
+REFERENCE_DB = os.environ.get("OLD_DATA_DB", "data/reference_data.db")
+# Path to the new data (SQLite DB)
+NEW_DATA_DB = os.environ.get("NEW_DATA_DB", "data/requests.db")
+# Drift configuration file (JSON)
+DRIFT_CONFIG = os.environ.get("DRIFT_CONFIG", "drift_config.json")
 
-# Konfiguration
-with open(DRIFT_CONFIG) as f:
-    config = json.load(f)
+# Load drift settings: threshold and feature list
+with open(DRIFT_CONFIG) as cfg_file:
+    config = json.load(cfg_file)
 THRESHOLD = config.get("ks_pvalue_threshold", 0.05)
-FEATURES  = config["features"]
+FEATURES = config.get("features", [])
 
-def load_from_csv(path):
-    return pd.read_csv(path, usecols=FEATURES)
-
-def load_from_db(path):
+# --- Helper functions ---
+def load_from_db(path: str) -> pd.DataFrame:
+    """
+    Load specified features from the 'requests' table in the given SQLite database.
+    """
     conn = sqlite3.connect(path)
-    df = pd.read_sql_query(f"SELECT {','.join(FEATURES)} FROM requests", conn)
+    query = f"SELECT {','.join(FEATURES)} FROM requests"
+    df = pd.read_sql_query(query, conn)
     conn.close()
     return df
 
-# Laden je nachdem, ob die Pfade auf .csv enden
-old = load_from_csv(OLD_DATA_PATH) if OLD_DATA_PATH.lower().endswith(".csv") else load_from_db(OLD_DATA_PATH)
-new = load_from_csv(NEW_DATA_PATH) if NEW_DATA_PATH.lower().endswith(".csv") else load_from_db(NEW_DATA_PATH)
+# --- Load datasets ---
+old_df = load_from_db(REFERENCE_DB)
+new_df = load_from_db(NEW_DATA_DB)
 
-# KS-Test
+# --- Perform KS-test per feature ---
 drifts = {}
-for feat in FEATURES:
-    stat, pval = ks_2samp(old[feat], new[feat])
-    drifts[feat] = pval
+for feature in FEATURES:
+    stat, p_value = ks_2samp(old_df[feature], new_df[feature])
+    drifts[feature] = p_value
 
+# Check if any feature's p-value is below the threshold
 drift_detected = any(p < THRESHOLD for p in drifts.values())
 
-with open("drift_result.json", "w") as f:
-    json.dump({"drift_detected": drift_detected, "feature_pvalues": drifts}, f)
+# Write result JSON
+result = {
+    "drift_detected": drift_detected,
+    "feature_pvalues": drifts
+}
+with open("drift_result.json", "w") as outfile:
+    json.dump(result, outfile)
 
-print("Drift detected?", drift_detected)
+# Console output for logs
+print(f"Drift detected? {drift_detected}")
