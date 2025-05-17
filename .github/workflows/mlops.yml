@@ -1,8 +1,8 @@
-"""
-GitHub Actions MLOps Pipeline for Fraud Detection Service
 
-Trigger on push to main, manual dispatch, or monthly schedule
-"""
+#GitHub Actions MLOps Pipeline for Fraud Detection Service
+
+#Trigger on push to main, manual dispatch, or monthly schedule
+
 
 name: MLOps Pipeline
 
