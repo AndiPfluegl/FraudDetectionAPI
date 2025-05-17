@@ -27,26 +27,23 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v3
 
-      - name: Ensure Docker volume exists
+      - name: Ensure fraud-data volume exists
         shell: pwsh
         run: |
-          docker volume inspect fraud-data -ErrorAction SilentlyContinue `
-            || docker volume create fraud-data
+          # Try to inspect; suppress stderr
+          docker volume inspect fraud-data 2>$null
+          # If last exit code ≠ 0 -> volume doesn't exist -> create it
+          if ($LASTEXITCODE -ne 0) {
+            docker volume create fraud-data
+          }
 
-      - name: Ensure reference volume exists
+      - name: Ensure fraud-reference volume exists
         shell: pwsh
         run: |
-          docker volume inspect fraud-reference -ErrorAction SilentlyContinue `
-            || docker volume create fraud-reference
-
-      - name: Copy reference_data.db from volume
-        shell: pwsh
-        run: |
-          docker run --rm `
-            -v fraud-reference:/mnt_ref `
-            -v "$Env:GITHUB_WORKSPACE\data:/workspace/data" `
-            alpine:latest `
-            sh -c "cp /mnt_ref/reference_data.db /workspace/data/reference_data.db"        
+          docker volume inspect fraud-reference 2>$null
+          if ($LASTEXITCODE -ne 0) {
+          docker volume create fraud-reference
+          }
 
       - name: Copy SQLite DB from persistent volume
         shell: pwsh
