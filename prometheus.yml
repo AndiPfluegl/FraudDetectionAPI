@@ -7,3 +7,7 @@ scrape_configs:
     bearer_token_file: /etc/prometheus/token.txt
     static_configs:
       - targets: ['host.docker.internal:5000']
+
+  - job_name: 'pushgateway'
+    static_configs:
+      - targets: [ 'pushgateway:9091' ]

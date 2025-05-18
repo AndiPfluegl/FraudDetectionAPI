@@ -12,6 +12,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
 import joblib
 import mlflow
+from prometheus_client import CollectorRegistry, Gauge, push_to_gateway
 
 # --- Configuration ---
 # Path to SQLite database containing 'requests' table
@@ -80,6 +81,11 @@ with mlflow.start_run():
     accuracy = clf.score(X_test, y_test)
     mlflow.log_metric("accuracy", accuracy)
     print(f"Logged accuracy: {accuracy}")
+
+    registry = CollectorRegistry()
+    g = Gauge("model_accuracy", "Latest model accuracy", registry=registry)
+    g.set(accuracy)
+    push_to_gateway("localhost:9091", job="fraud-retrain", registry=registry)
 
     # Log model to MLflow registry and save locally
     mlflow.sklearn.log_model(
