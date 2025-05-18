@@ -85,7 +85,12 @@ with mlflow.start_run():
     registry = CollectorRegistry()
     g = Gauge("model_accuracy", "Latest model accuracy", registry=registry)
     g.set(accuracy)
-    push_to_gateway("localhost:9091", job="fraud-retrain", registry=registry)
+    try:
+        # Use PUSHGATEWAY_URL env or default to localhost:9091
+        gateway = os.environ.get("PUSHGATEWAY_URL", "localhost:9091")
+        push_to_gateway(gateway, job="fraud-retrain", registry=registry)
+    except Exception as e:
+        print(f"Warning: failed to push model_accuracy to Pushgateway ({gateway}): {e}")
 
     # Log model to MLflow registry and save locally
     mlflow.sklearn.log_model(
