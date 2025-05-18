@@ -54,11 +54,14 @@ jobs:
             alpine:latest `
             sh -c "cp /mnt/requests.db /workspace/data/requests.db"
 
-      - name: Upload reference-data artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: reference-data
-          path: data/reference_data.db
+      - name: Copy reference_data.db from persistent volume
+        shell: pwsh
+        run: |
+          docker run --rm `
+            -v fraud-reference:/mnt_ref `
+            -v "$Env:GITHUB_WORKSPACE\data:/workspace/data" `
+            alpine:latest `
+            sh -c "cp /mnt_ref/reference_data.db /workspace/data/reference_data.db"
 
       - name: Upload latest-db artifact
         uses: actions/upload-artifact@v4
