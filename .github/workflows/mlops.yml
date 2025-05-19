@@ -124,7 +124,7 @@ jobs:
   # 3) retrain_job: Retrain model if drift detected or on schedule
   retrain_job:
     needs: drift_job
-    if: needs.drift_job.outputs.drift == 'true' || github.event_name == 'schedule'
+    #if: needs.drift_job.outputs.drift == 'true' || github.event_name == 'schedule'
     runs-on: ubuntu-latest
 
     services:
@@ -134,7 +134,7 @@ jobs:
           - 9091:9091
 
     env:
-      PUSHGATEWAY_URL: pushgateway:9091
+      PUSHGATEWAY_URL: localhost:9091
 
     steps:
       - uses: actions/checkout@v3
