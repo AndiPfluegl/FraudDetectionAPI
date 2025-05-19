@@ -8,7 +8,7 @@ import sqlite3
 import os
 
 # --- Configuration ---
-CSV_PATH = os.environ.get("CSV_PATH", "data/monthly/new_data_month_12.csv")
+CSV_PATH = os.environ.get("CSV_PATH", "data/monthly/new_data_month_1.csv")
 DB_PATH = os.environ.get("DB_PATH", "data/requests.db")
 
 # --- Load CSV into DataFrame ---
