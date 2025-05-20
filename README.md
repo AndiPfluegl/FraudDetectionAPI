@@ -1,79 +1,59 @@
-Fraud Detection API
+# Fraud Detection API & MLOps Pipeline
 
-This repository provides a simple fraud detection RESTful service, integrated into an automated MLOps pipeline using GitHub Actions and self‑hosted Docker volumes.
+This repository contains a complete end-to-end solution for a fraud detection service, including:
 
-Project Structure
+- A Flask-based RESTful API that serves a trained Random Forest model to predict fraud probability.  
+- Persistent storage of prediction requests in SQLite (via Docker volume).  
+- Data drift detection using a Kolmogorov–Smirnov test to detect shifts in feature distributions.  
+- Automated model retraining and redeployment using GitHub Actions and a self-hosted runner.  
+- Monitoring of service metrics (prediction counts, probability distributions) via Prometheus & Grafana.  
+- PushGateway integration to report model accuracy to Prometheus.
 
-├── app.py                     # Flask application exposing /predict and /metrics
-├── import_csv_to_sqlite.py    # Utility: build initial reference DB from CSV
-├── drift_detector.py          # KS‑test based data drift detector
-├── retrain_model.py           # Retrain RandomForest on SQLite data
-├── Dockerfile                 # Dockerfile
-├── .github/workflows/         # CI/CD pipeline definitions
-│   └── mlops.yml
-├── data/
-│   ├── reference_data.db      # Seed reference database (versioned)
-│   └── drift_config.json      # Features & p‑value threshold config
-├── models/                    # Trained model artifacts (Pickle)
-└── requirements.txt           # Python dependencies
+---
 
-Quick Start
+## Table of Contents
 
-Build and run the API
+1. [Prerequisites](#prerequisites)  
+2. [Setup & Installation](#setup--installation)  
+3. [Running the Fraud Detection API](#running-the-fraud-detection-api)  
+4. [API Usage](#api-usage)  
+5. [Data Drift Detection & Retraining](#data-drift-detection--retraining)  
+6. [CI/CD Pipeline](#cicd-pipeline)  
+7. [Monitoring](#monitoring)  
+8. [Architecture Overview](#architecture-overview)  
+9. [Configuration](#configuration)  
+10. [Contributing](#contributing)  
+11. [License](#license)  
 
-docker build -t fraud-api:latest .
-docker run -d --name fraud_api \
-  -v fraud-data:/app/data \
-  -e API_TOKEN="<your-token>" \
-  -e LATEST_DB=/app/data/requests.db \
-  -e FRAUD_THRESHOLD=0.4 \
-  -p 5000:5000 fraud-api:latest
+---
 
-Send a test prediction
+## Prerequisites
 
-curl -X POST http://localhost:5000/predict \
-  -H "Authorization: Bearer <your-token>" \
-  -H "Content-Type: application/json" \
-  -d '{"data":[[...28 feature values..., 0.99]]}'
+- Docker & Docker Compose  
+- Python 3.10+ (if running scripts locally)  
+- GitHub account with permissions to set up Secrets  
+- (Optional) Grafana for dashboarding  
 
-Inspect metrics
+---
 
-curl http://localhost:5000/metrics -H "Authorization: Bearer <your-token>"
+## Setup & Installation
 
-MLOps Pipeline
+1. **Clone the repository**:
 
-The GitHub Actions workflow (.github/workflows/mlops.yml) automates:
+   ```bash
+   git clone https://github.com/AndiPfluegl/FraudDetectionAPI.git
+   cd FraudDetectionAPI
 
-deploy_job – Extract latest requests.db from fraud-data volume.
+2. **Configure environment variables (either in .env or shell)**:
 
-drift_job – Compare reference_data.db ↔ requests.db via KS‑test.
+   ```bash
+   export API_TOKEN="your_secure_token"
+   export FRAUD_THRESHOLD=0.4
 
-retrain_job – Retrain model if drift detected or on monthly schedule.
+3. **Create Docker volumes:**:
 
-update_reference – Overwrite the fraud-reference volume with the latest requests.db.
+   ```bash
+   docker volume create fraud-data
+   docker volume create fraud-reference
 
-build-and-push – Build and push updated Docker image with new model.
-
-deploy_final – Restart local container with fraud-api:latest.
-
-Cleaning Up the Repo
-
-Remove raw CSVs and temporary files; only keep data/reference_data.db and drift_config.json in /data.
-
-Add /data/requests.db and /app/data/* to .gitignore to avoid committing runtime data.
-
-Ensure /models only contains versioned model artefacts (if any).
-
-Code Comments
-
-All Python scripts are documented with English comments explaining:
-
-Configuration (environment variables and defaults)
-
-Data loading (CSV vs SQLite)
-
-Drift detection logic
-
-Retraining and model logging
-
-Please review each script and fill in any missing docstrings or inline comments.
+   
